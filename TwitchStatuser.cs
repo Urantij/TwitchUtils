@@ -49,7 +49,9 @@ public class TwitchStatuser
     {
         try
         {
-            bool? online = null;
+            // Можно было бы сравнить info.online и lastOnline
+            // Но это было бы вне лока, а мне не хоетсй.
+            bool statusChanged = false;
 
             lock (locker)
             {
@@ -60,6 +62,7 @@ public class TwitchStatuser
                         logger?.LogInformation("Стрим поднялся. {name}", sender?.GetType().Name);
 
                         lastOnline = true;
+                        statusChanged = true;
                     }
                 }
                 else
@@ -69,14 +72,16 @@ public class TwitchStatuser
                         logger?.LogInformation("Стрим опустился. {name}", sender?.GetType().Name);
 
                         lastOnline = false;
+                        statusChanged = true;
                     }
                 }
             }
 
-            if (online == true)
-                ChannelOnline?.Invoke(info);
-            else if (online == false)
-                ChannelOffline?.Invoke(info);
+            if (statusChanged)
+                if (info.online)
+                    ChannelOnline?.Invoke(info);
+                else
+                    ChannelOffline?.Invoke(info);
 
             ChannelUpdate?.Invoke(info);
         }

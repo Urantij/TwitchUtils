@@ -1,21 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
 namespace TwitchUtils.Checkers;
 
-public class TwitchCheckInfo
+public class TwitchCheckInfo(bool online, DateTime checkTime)
 {
-    public readonly bool online;
+    public readonly bool Online = online;
+
     /// <summary>
     /// UTC
     /// </summary>
-    public readonly DateTime checkTime;
-
-    public TwitchCheckInfo(bool online, DateTime checkTime)
-    {
-        this.online = online;
-        this.checkTime = checkTime;
-    }
+    public readonly DateTime CheckTime = checkTime;
 }

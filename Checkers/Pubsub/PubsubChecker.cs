@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using TwitchSimpleLib.Pubsub;
 using TwitchSimpleLib.Pubsub.Payloads.Playback;
@@ -10,45 +6,50 @@ namespace TwitchUtils.Checkers.Pubsub;
 
 public class PubsubChecker : ITwitchChecker, IDisposable
 {
-    private readonly ILogger<PubsubChecker>? logger;
+    private readonly ILogger<PubsubChecker>? _logger;
 
-    private readonly TwitchPubsubClient client;
+    private readonly TwitchPubsubClient _client;
+
+    public bool TrustWorthy => true;
 
     public event EventHandler<TwitchCheckInfo>? ChannelChecked;
 
-    public PubsubChecker(TwitchStatuserConfig config, ILoggerFactory? loggerFactory = null, CancellationToken cancellationToken = default)
+    public PubsubChecker(TwitchStatuserConfig config, ILoggerFactory? loggerFactory = null,
+        CancellationToken cancellationToken = default)
     {
-        this.logger = loggerFactory?.CreateLogger<PubsubChecker>();
+        this._logger = loggerFactory?.CreateLogger<PubsubChecker>();
 
-        client = new TwitchPubsubClient(new TwitchPubsubClientOpts()
+        _client = new TwitchPubsubClient(new TwitchPubsubClientOpts()
         {
         }, loggerFactory, cancellationToken);
-        client.Connected += ClientConnected;
-        client.ConnectionClosed += ClientConnectionClosed;
+        _client.Connected += ClientConnected;
+        _client.ConnectionClosed += ClientConnectionClosed;
 
-        var topic = client.AddPlaybackTopic(config.ChannelId);
+        var topic = _client.AddPlaybackTopic(config.ChannelId);
         topic.DataReceived = PlaybackReceived;
     }
 
     public async Task StartAsync()
     {
-        logger?.LogInformation("Начинаем.");
+        _logger?.LogInformation("Начинаем.");
 
-        await client.ConnectAsync();
+        await _client.ConnectAsync();
     }
 
     private void PlaybackReceived(PlaybackData data)
     {
         bool up;
-        if (data.Type == "stream-up")
+        switch (data.Type)
         {
-            up = true;
+            case "stream-up":
+                up = true;
+                break;
+            case "stream-down":
+                up = false;
+                break;
+            default:
+                return;
         }
-        else if (data.Type == "stream-down")
-        {
-            up = false;
-        }
-        else return;
 
         TwitchCheckInfo checkInfo = new(up, DateTime.UtcNow);
 
@@ -58,26 +59,25 @@ public class PubsubChecker : ITwitchChecker, IDisposable
         }
         catch (Exception e)
         {
-            logger?.LogError(e, $"{nameof(PlaybackReceived)}");
+            _logger?.LogError(e, $"{nameof(PlaybackReceived)}");
         }
     }
 
     private void ClientConnected()
     {
-        logger?.LogInformation("Клиент присоединился.");
+        _logger?.LogInformation("Клиент присоединился.");
     }
 
     private void ClientConnectionClosed(Exception? exception)
     {
-        if (logger != null)
-        {
-            logger.LogInformation("Клиент потерял соединение. {message}", exception?.Message);
-            logger.LogDebug(exception, "Клиент потерял соединение.");
-        }
+        if (_logger == null) return;
+
+        _logger.LogInformation("Клиент потерял соединение. {message}", exception?.Message);
+        _logger.LogDebug(exception, "Клиент потерял соединение.");
     }
 
     public void Dispose()
     {
-        client.Close();
+        _client.Close();
     }
 }

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using TwitchLib.Api;
 
@@ -9,44 +5,47 @@ namespace TwitchUtils.Checkers.Helix;
 
 public class HelixChecker : ITwitchChecker
 {
-    private readonly ILogger<HelixChecker>? logger;
-    private readonly TwitchStatuserConfig config;
-    private readonly HelixConfig helixConfig;
+    private readonly ILogger<HelixChecker>? _logger;
+    private readonly TwitchStatuserConfig _config;
+    private readonly HelixConfig _helixConfig;
 
-    private readonly TwitchAPI api;
+    private readonly TwitchAPI _api;
 
-    private readonly CancellationToken cancellationToken;
+    private readonly CancellationToken _cancellationToken;
+
+    public bool TrustWorthy => false;
 
     public event EventHandler<TwitchCheckInfo>? ChannelChecked;
 
-    public HelixChecker(TwitchStatuserConfig config, ILoggerFactory? loggerFactory = null, CancellationToken cancellationToken = default)
+    public HelixChecker(TwitchStatuserConfig config, ILoggerFactory? loggerFactory = null,
+        CancellationToken cancellationToken = default)
     {
-        this.logger = loggerFactory?.CreateLogger<HelixChecker>();
+        this._logger = loggerFactory?.CreateLogger<HelixChecker>();
 
         if (config.Helix == null)
         {
             throw new NullReferenceException(nameof(HelixConfig));
         }
 
-        this.config = config;
-        helixConfig = this.config.Helix;
-        this.cancellationToken = cancellationToken;
+        this._config = config;
+        _helixConfig = this._config.Helix;
+        this._cancellationToken = cancellationToken;
 
-        api = new TwitchAPI();
-        api.Settings.ClientId = helixConfig.ClientId;
-        api.Settings.Secret = helixConfig.Secret;
+        _api = new TwitchAPI();
+        _api.Settings.ClientId = _helixConfig.ClientId;
+        _api.Settings.Secret = _helixConfig.Secret;
     }
 
     public void Start()
     {
-        logger?.LogInformation("Начинаем. Частота обновлений {time}", helixConfig.HelixCheckDelay);
+        _logger?.LogInformation("Начинаем. Частота обновлений {time}", _helixConfig.HelixCheckDelay);
 
-        Task.Run(CheckLoopAsync);
+        Task.Run(CheckLoopAsync, _cancellationToken);
     }
 
-    async Task CheckLoopAsync()
+    private async Task CheckLoopAsync()
     {
-        while (!cancellationToken.IsCancellationRequested)
+        while (!_cancellationToken.IsCancellationRequested)
         {
             TwitchCheckInfo? checkInfo = await CheckChannelAsync();
 
@@ -55,9 +54,13 @@ public class HelixChecker : ITwitchChecker
             {
                 try
                 {
-                    await Task.Delay(helixConfig.HelixCheckDelay.Multiply(1.5), cancellationToken);
+                    await Task.Delay(_helixConfig.HelixCheckDelay.Multiply(1.5), _cancellationToken);
                 }
-                catch { return; }
+                catch
+                {
+                    return;
+                }
+
                 continue;
             }
 
@@ -67,17 +70,20 @@ public class HelixChecker : ITwitchChecker
             }
             catch (Exception e)
             {
-                logger?.LogError(e, $"{nameof(CheckLoopAsync)}");
+                _logger?.LogError(e, $"{nameof(CheckLoopAsync)}");
             }
 
             try
             {
-                await Task.Delay(helixConfig.HelixCheckDelay, cancellationToken);
+                await Task.Delay(_helixConfig.HelixCheckDelay, _cancellationToken);
             }
-            catch { return; }
+            catch
+            {
+                return;
+            }
         }
 
-        logger?.LogInformation("Закончили.");
+        _logger?.LogInformation("Закончили.");
     }
 
     /// <returns>null, если ошибка внеплановая</returns>
@@ -87,7 +93,8 @@ public class HelixChecker : ITwitchChecker
 
         try
         {
-            var response = await api.Helix.Streams.GetStreamsAsync(userIds: new List<string>() { config.ChannelId }, first: 1);
+            var response =
+                await _api.Helix.Streams.GetStreamsAsync(userIds: [_config.ChannelId], first: 1);
 
             if (response.Streams.Length == 0)
             {
@@ -101,29 +108,30 @@ public class HelixChecker : ITwitchChecker
         }
         catch (TwitchLib.Api.Core.Exceptions.BadScopeException)
         {
-            logger?.LogWarning($"CheckChannel exception опять BadScopeException");
+            _logger?.LogWarning($"CheckChannel exception опять BadScopeException");
 
             return null;
         }
         catch (TwitchLib.Api.Core.Exceptions.InternalServerErrorException)
         {
-            logger?.LogWarning($"CheckChannel exception опять InternalServerErrorException");
+            _logger?.LogWarning($"CheckChannel exception опять InternalServerErrorException");
 
             return null;
         }
         catch (HttpRequestException e)
         {
-            logger?.LogWarning("CheckChannel HttpRequestException: \"{Message}\"", e.Message);
+            _logger?.LogWarning("CheckChannel HttpRequestException: \"{Message}\"", e.Message);
 
             return null;
         }
         catch (Exception e)
         {
-            logger?.LogError(e, "CheckChannel");
+            _logger?.LogError(e, "CheckChannel");
 
             return null;
         }
 
-        return new HelixCheck(true, DateTime.UtcNow, new TwitchChannelInfo(stream.Title, stream.GameName, stream.GameId, stream.ViewerCount));
+        return new HelixCheck(true, DateTime.UtcNow,
+            new TwitchChannelInfo(stream.Title, stream.GameName, stream.GameId, stream.ViewerCount));
     }
 }

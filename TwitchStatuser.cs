@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using TwitchUtils.Checkers;
 using TwitchUtils.Checkers.Helix;
@@ -14,30 +10,38 @@ namespace TwitchUtils;
 /// </summary>
 public class TwitchStatuser
 {
-    readonly ILogger? logger;
-    private readonly TwitchStatuserConfig config;
+    private readonly ILogger? _logger;
 
-    bool lastOnline = false;
+    private bool _lastOnline = false;
+    private DateTime? _lastOnlineUpdateDate = null;
+
+    /// <summary>
+    /// Если ивент пришёл от сомнительного источника, не принимать его во внимание, если последнее обновление было ранее этого количества времени.
+    /// Хеликс имеет дурную привычку опаздывать с обновлением секунд на 5. Что даёт двойные срабатывания online ивента.
+    /// </summary>
+    private readonly TimeSpan _notTrustworthyUpdateDelay = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Пришло обновление онлайн, и канал был оффлаин.
     /// </summary>
     public event Action<TwitchCheckInfo>? ChannelOnline;
+
     /// <summary>
     /// Пришло обновление оффлаин, и канал был онлайн.
     /// </summary>
     public event Action<TwitchCheckInfo>? ChannelOffline;
+
     /// <summary>
     /// Пришло обновление. <see cref="HelixCheck"/> приходит, даже если ничего не изменилось.
     /// </summary>
     public event Action<TwitchCheckInfo>? ChannelUpdate;
 
-    readonly private object locker = new();
+    private readonly object _locker = new();
 
-    public TwitchStatuser(TwitchStatuserConfig config, IEnumerable<ITwitchChecker> checkers, ILoggerFactory? loggerFactory = null, CancellationToken cancellationToken = default)
+    public TwitchStatuser(IEnumerable<ITwitchChecker> checkers,
+        ILoggerFactory? loggerFactory = null)
     {
-        this.config = config;
-        this.logger = loggerFactory?.CreateLogger<TwitchStatuser>();
+        this._logger = loggerFactory?.CreateLogger<TwitchStatuser>();
 
         foreach (var checker in checkers)
         {
@@ -53,41 +57,59 @@ public class TwitchStatuser
             // Но это было бы вне лока, а мне не хоетсй.
             bool statusChanged = false;
 
-            lock (locker)
+            lock (_locker)
             {
-                if (info.online)
+                if (info.Online)
                 {
-                    if (!lastOnline)
+                    if (!_lastOnline)
                     {
-                        logger?.LogInformation("Стрим поднялся. {name}", sender?.GetType().Name);
+                        _logger?.LogInformation("Стрим поднялся. {name}", sender?.GetType().Name);
 
-                        lastOnline = true;
+                        _lastOnline = true;
                         statusChanged = true;
                     }
                 }
                 else
                 {
-                    if (lastOnline)
+                    if (_lastOnline)
                     {
-                        logger?.LogInformation("Стрим опустился. {name}", sender?.GetType().Name);
+                        _logger?.LogInformation("Стрим опустился. {name}", sender?.GetType().Name);
 
-                        lastOnline = false;
+                        _lastOnline = false;
                         statusChanged = true;
                     }
                 }
             }
 
+            if (sender is not ITwitchChecker checker)
+            {
+                _logger?.LogCritical("Че это у вас тут происходит, чекер не чекер {name}", sender?.GetType().Name);
+                return;
+            }
+
+            if (statusChanged && !checker.TrustWorthy)
+            {
+                TimeSpan? timePassedSinceLastUpdate = DateTime.UtcNow - _lastOnlineUpdateDate;
+
+                statusChanged = timePassedSinceLastUpdate == null ||
+                                timePassedSinceLastUpdate >= _notTrustworthyUpdateDelay;
+            }
+
             if (statusChanged)
-                if (info.online)
+            {
+                if (info.Online)
                     ChannelOnline?.Invoke(info);
                 else
                     ChannelOffline?.Invoke(info);
+
+                _lastOnlineUpdateDate = DateTime.UtcNow;
+            }
 
             ChannelUpdate?.Invoke(info);
         }
         catch (Exception e)
         {
-            logger?.LogError(e, "Ошибка при обработке информации. {name}", sender?.GetType().Name);
+            _logger?.LogError(e, "Ошибка при обработке информации. {name}", sender?.GetType().Name);
         }
     }
 
@@ -95,7 +117,9 @@ public class TwitchStatuser
     /// Создаёт и запускает всё.
     /// </summary>
     /// <returns></returns>
-    public static async Task<TwitchStatuser> CreateAsync(TwitchStatuserConfig config, Action<TwitchStatuser> prelaunchDelegate, ILoggerFactory? loggerFactory = null, CancellationToken cancellationToken = default)
+    public static async Task<TwitchStatuser> CreateAsync(TwitchStatuserConfig config,
+        Action<TwitchStatuser> prelaunchDelegate, ILoggerFactory? loggerFactory = null,
+        CancellationToken cancellationToken = default)
     {
         List<ITwitchChecker> checkers = new();
 
@@ -108,6 +132,7 @@ public class TwitchStatuser
 
             checkers.Add(pubsub);
         }
+
         if (config.Helix != null)
         {
             helix = new(config, loggerFactory, cancellationToken);
@@ -115,7 +140,7 @@ public class TwitchStatuser
             checkers.Add(helix);
         }
 
-        TwitchStatuser statuser = new(config, checkers, loggerFactory, cancellationToken);
+        TwitchStatuser statuser = new(checkers, loggerFactory);
 
         prelaunchDelegate.Invoke(statuser);
 

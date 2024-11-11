@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwitchUtils", "TwitchUtils\TwitchUtils.csproj", "{61D5AED9-F769-4482-BDE3-54B6CEF1AD75}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TwitchLib.Api", "TwitchLib.Api\TwitchLib.Api\TwitchLib.Api.csproj", "{0434915A-6BFB-4DD7-9E86-A75ED694CD53}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{61D5AED9-F769-4482-BDE3-54B6CEF1AD75}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{61D5AED9-F769-4482-BDE3-54B6CEF1AD75}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{61D5AED9-F769-4482-BDE3-54B6CEF1AD75}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0434915A-6BFB-4DD7-9E86-A75ED694CD53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0434915A-6BFB-4DD7-9E86-A75ED694CD53}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0434915A-6BFB-4DD7-9E86-A75ED694CD53}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0434915A-6BFB-4DD7-9E86-A75ED694CD53}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

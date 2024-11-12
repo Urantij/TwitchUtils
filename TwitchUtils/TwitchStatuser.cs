@@ -10,16 +10,11 @@ namespace TwitchUtils;
 /// </summary>
 public class TwitchStatuser
 {
+    private readonly TwitchStatuserConfig _config;
     private readonly ILogger? _logger;
 
     private bool _lastOnline = false;
     private DateTime? _lastOnlineUpdateDate = null;
-
-    /// <summary>
-    /// Если ивент пришёл от сомнительного источника, не принимать его во внимание, если последнее обновление было ранее этого количества времени.
-    /// Хеликс имеет дурную привычку опаздывать с обновлением секунд на 5. Что даёт двойные срабатывания online ивента.
-    /// </summary>
-    private readonly TimeSpan _notTrustworthyUpdateDelay = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Пришло обновление онлайн, и канал был оффлаин.
@@ -33,9 +28,10 @@ public class TwitchStatuser
 
     private readonly object _locker = new();
 
-    public TwitchStatuser(IEnumerable<ITwitchChecker> checkers,
+    public TwitchStatuser(IEnumerable<ITwitchChecker> checkers, TwitchStatuserConfig config,
         ILoggerFactory? loggerFactory = null)
     {
+        _config = config;
         this._logger = loggerFactory?.CreateLogger<TwitchStatuser>();
 
         foreach (var checker in checkers)
@@ -133,7 +129,7 @@ public class TwitchStatuser
             checkers.Add(helix);
         }
 
-        TwitchStatuser statuser = new(checkers, loggerFactory);
+        TwitchStatuser statuser = new(checkers, config, loggerFactory);
 
         prelaunchDelegate.Invoke(statuser);
 

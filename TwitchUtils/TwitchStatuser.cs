@@ -31,11 +31,6 @@ public class TwitchStatuser
     /// </summary>
     public event Action<TwitchCheckInfo>? ChannelOffline;
 
-    /// <summary>
-    /// Пришло обновление. <see cref="HelixCheck"/> приходит, даже если ничего не изменилось.
-    /// </summary>
-    public event Action<TwitchCheckInfo>? ChannelUpdate;
-
     private readonly object _locker = new();
 
     public TwitchStatuser(IEnumerable<ITwitchChecker> checkers,
@@ -104,8 +99,6 @@ public class TwitchStatuser
 
                 _lastOnlineUpdateDate = DateTime.UtcNow;
             }
-
-            ChannelUpdate?.Invoke(info);
         }
         catch (Exception e)
         {

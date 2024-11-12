@@ -15,6 +15,9 @@ public class HelixChecker : ITwitchChecker
 
     public bool TrustWorthy => false;
 
+    /// <summary>
+    /// Пришло обновление. <see cref="HelixCheck"/> приходит, даже если ничего не изменилось.
+    /// </summary>
     public event EventHandler<TwitchCheckInfo>? ChannelChecked;
 
     public HelixChecker(TwitchStatuserConfig config, ILoggerFactory? loggerFactory = null,

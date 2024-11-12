@@ -42,6 +42,12 @@ public class TwitchStatuser
 
     private void ChannelChecked(object? sender, TwitchCheckInfo info)
     {
+        if (sender is not ITwitchChecker checker)
+        {
+            _logger?.LogCritical("Че это у вас тут происходит, чекер не чекер {name}", sender?.GetType().Name);
+            return;
+        }
+
         try
         {
             // Можно было бы сравнить info.online и lastOnline
@@ -50,6 +56,17 @@ public class TwitchStatuser
 
             lock (_locker)
             {
+                if (!checker.TrustWorthy)
+                {
+                    TimeSpan? timePassedSinceLastUpdate = DateTime.UtcNow - _lastOnlineUpdateDate;
+
+                    if (timePassedSinceLastUpdate != null &&
+                        timePassedSinceLastUpdate < _config.NotTrustworthyUpdateDelay)
+                    {
+                        return;
+                    }
+                }
+
                 if (info.Online)
                 {
                     if (!_lastOnline)
@@ -57,6 +74,7 @@ public class TwitchStatuser
                         _logger?.LogInformation("Стрим поднялся. {name}", sender?.GetType().Name);
 
                         _lastOnline = true;
+                        _lastOnlineUpdateDate = DateTime.UtcNow;
                         statusChanged = true;
                     }
                 }
@@ -67,23 +85,10 @@ public class TwitchStatuser
                         _logger?.LogInformation("Стрим опустился. {name}", sender?.GetType().Name);
 
                         _lastOnline = false;
+                        _lastOnlineUpdateDate = DateTime.UtcNow;
                         statusChanged = true;
                     }
                 }
-            }
-
-            if (sender is not ITwitchChecker checker)
-            {
-                _logger?.LogCritical("Че это у вас тут происходит, чекер не чекер {name}", sender?.GetType().Name);
-                return;
-            }
-
-            if (statusChanged && !checker.TrustWorthy)
-            {
-                TimeSpan? timePassedSinceLastUpdate = DateTime.UtcNow - _lastOnlineUpdateDate;
-
-                statusChanged = timePassedSinceLastUpdate == null ||
-                                timePassedSinceLastUpdate >= _notTrustworthyUpdateDelay;
             }
 
             if (statusChanged)
@@ -92,8 +97,6 @@ public class TwitchStatuser
                     ChannelOnline?.Invoke(info);
                 else
                     ChannelOffline?.Invoke(info);
-
-                _lastOnlineUpdateDate = DateTime.UtcNow;
             }
         }
         catch (Exception e)
